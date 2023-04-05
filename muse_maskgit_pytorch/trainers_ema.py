@@ -351,7 +351,8 @@ class VQGanVAETrainerEMA(nn.Module):
             self.discr_optim.zero_grad()
 
             for _ in range(self.grad_accum_every):
-                img = next(self.dl_iter)
+                data = next(self.dl_iter)
+                img = data['full']
                 img = img.to(device)
 
                 loss = self.vae(img, return_discr_loss = True)
@@ -386,6 +387,9 @@ class VQGanVAETrainerEMA(nn.Module):
                 model.eval()
 
                 valid_data = next(self.valid_dl_iter)
+                down = valid_data['down']
+                full = valid_data['full']
+                valid_data = torch.cat([down, full], dim=0)
                 valid_data = valid_data.to(device)
 
                 recons = model(valid_data, return_recons = True)

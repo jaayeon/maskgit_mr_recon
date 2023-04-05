@@ -14,14 +14,15 @@ def get_args_parser():
     parser.add_argument('--mode', default='train', choices=['train', 'test'])
     parser.add_argument('--data_path', default='../../data/')
     parser.add_argument('--output_path', default='', type=str)
+    parser.add_argument('--batch_size', default=2, type=int)
 
     parser.add_argument('--seed', default=2, type=int)
     parser.add_argument('--dataset', default='fastmri', type=str, choices=['fastmri', 'ixi'])
     parser.add_argument('--input_size', default=320, type=int)
     parser.add_argument('--domain', default='img', type=str, choices=['img', 'kspace'])
-    parser.add_argument('--down', default='uniform', choices=['uniform', 'random'], help='method of constructing undersampled data')
+    parser.add_argument('--down', default='random', choices=['uniform', 'random'], help='method of constructing undersampled data')
     parser.add_argument('--low_freq_ratio', default=0.7, help='ratio of low frequency lines')
-    parser.add_argument('--downsample', default=32, type=int, help='maximum acceleration factor')
+    parser.add_argument('--downsample', default=16, type=int, help='maximum acceleration factor')
     
     return parser
 
@@ -38,8 +39,8 @@ def run_vqgan(args, dataset):
     trainer = VQGanVAETrainer(
         vae=vae,
         dataset=dataset,
-        image_size=320,
-        batch_size=2,
+        image_size=args.input_size,
+        batch_size=args.batch_size,
         grad_accum_every=8,
         num_train_steps=50000, 
         results_folder=args.output_path,
@@ -53,7 +54,7 @@ def run_vqgan_ema(args, dataset):
     vae = VQGanVAE(
         channels=1,
         layers=4,
-        dim=512,
+        dim=256,
         vq_codebook_dim=32, #256
         vq_codebook_size=1024
     )
@@ -61,8 +62,8 @@ def run_vqgan_ema(args, dataset):
     trainer = VQGanVAETrainerEMA(
         vae=vae,
         dataset=dataset,
-        image_size=320,
-        batch_size=2,
+        image_size=args.input_size,
+        batch_size=args.batch_size,
         grad_accum_every=8,
         num_train_steps=50000,
         results_folder=args.output_path,
