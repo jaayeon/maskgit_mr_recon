@@ -386,7 +386,7 @@ class VQGanVAETrainer(nn.Module):
                 imgs_and_recons = rearrange(imgs_and_recons, 'r b ... -> (b r) ...')
 
                 imgs_and_recons = imgs_and_recons.detach().cpu().float().clamp(0., 1.)
-                grid = make_grid(imgs_and_recons, nrow = 2, normalize = True, scale_each=True, value_range = (-6, 6))
+                grid = make_grid(imgs_and_recons, nrow = 4, normalize = True, scale_each=True)
 
                 logs['reconstructions'] = grid
 

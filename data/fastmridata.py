@@ -91,24 +91,26 @@ class FastMRIDataset(Dataset):
                 raise NotImplementedError
 
 
-    '''
-    def normalize(self, arr, eps=1e-08): #[0,1] for spatial domain
+
+    def scale01(self, arr, eps=1e-08): #[0,1] for spatial domain
         max = torch.max(arr)
         min = torch.min(arr)
         arr = (arr-min)/(max-min+eps)
         return arr
-    '''
+
 
     def normalize(self, arr, mean, std, eps=1e-08):
-        normalized = (arr-mean)/(std+eps)
-        return normalized.clamp(-6,6)
+        arr = (arr-mean)/(std+eps)
+        arr.clamp(-6,6)
+        arr = self.scale01(arr)
+        return arr
 
         
     def normalize_instance(self, arr: torch.Tensor, eps=1e-08):
         mean = arr.mean()
         std = arr.std()
-        normalized = self.normalize(arr, mean, std, eps=eps)
-        return normalized.clamp(-6,6), mean, std
+        arr = self.normalize(arr, mean, std, eps=eps)
+        return arr.clamp(-6,6), mean, std
     
 
     def scale(self, arr): #[-6~6] for kspace
@@ -143,6 +145,7 @@ class FastMRIDataset(Dataset):
     def downsample(self, arr, idx):
         c,h,w=arr.shape
         downsample = self.rng.uniform(size=1)[0]*self.opt.downsample
+        downsample = 2. if downsample<2 else downsample
         num_low_freqs = int(self.opt.input_size/downsample*self.opt.low_freq_ratio)
         num_high_freqs = int(self.opt.input_size/downsample)-num_low_freqs
 

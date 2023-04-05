@@ -389,7 +389,8 @@ class VQGanVAETrainerEMA(nn.Module):
                 valid_data = next(self.valid_dl_iter)
                 down = valid_data['down']
                 full = valid_data['full']
-                valid_data = torch.cat([down, full], dim=0)
+                valid_data = torch.stack([down, full], dim=0)
+                valid_data = rearrange(valid_data, 'r b ... -> (b r) ...')
                 valid_data = valid_data.to(device)
 
                 recons = model(valid_data, return_recons = True)
@@ -400,7 +401,7 @@ class VQGanVAETrainerEMA(nn.Module):
                 imgs_and_recons = rearrange(imgs_and_recons, 'r b ... -> (b r) ...')
 
                 imgs_and_recons = imgs_and_recons.detach().cpu().float().clamp(0., 1.)
-                grid = make_grid(imgs_and_recons, nrow = 2, normalize = True, scale_each=True, value_range = (-6, 6))
+                grid = make_grid(imgs_and_recons, nrow = 4, normalize = True, scale_each=True)
 
                 logs['reconstructions'] = grid
 
