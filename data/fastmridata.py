@@ -100,13 +100,15 @@ class FastMRIDataset(Dataset):
     '''
 
     def normalize(self, arr, mean, std, eps=1e-08):
-        return (arr-mean)/(std+eps)
+        normalized = arr-mean)/(std+eps)
+        return torch.clamp(normalized)
 
         
     def normalize_instance(self, arr: torch.Tensor, eps=1e-08):
         mean = arr.mean()
         std = arr.std()
-        return self.normalize(arr, mean, std, eps=eps), mean, std
+        normalized = self.normalize(arr, mean, std, eps=eps)
+        return normalized.clamp(-6,6), mean, std
     
 
     def scale(self, arr): #[-6~6] for kspace
