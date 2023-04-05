@@ -333,7 +333,7 @@ class VQGanVAETrainerEMA(nn.Module):
                     return_latent = True)
                 
             # add loss between encoder output of down-emavae and full-vae 
-            loss = loss + F.SmoothL1Loss(fmap, fmap_ema).sum(dim=-1).sum()
+            loss = loss + F.smooth_l1_loss(fmap, fmap_ema).sum(dim=-1).sum()
 
             self.accelerator.backward(loss / self.grad_accum_every)
 
