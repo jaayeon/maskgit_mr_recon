@@ -10,6 +10,7 @@ import torch
 from torch import nn
 from torch.optim import Adam
 from torch.utils.data import Dataset, DataLoader, random_split
+import torch.nn.functional as F
 
 import torchvision.transforms as T
 from torchvision.datasets import ImageFolder
@@ -117,7 +118,7 @@ class ImageDataset(Dataset):
 # main trainer class
 
 @beartype
-class VQGanVAETrainer(nn.Module):
+class VQGanVAETrainerEMA(nn.Module):
     def __init__(
         self,
         vae: VQGanVAE,
@@ -313,15 +314,26 @@ class VQGanVAETrainer(nn.Module):
 
         for _ in range(self.grad_accum_every):
             data = next(self.dl_iter)
-            img = data['full']
-            img = img.to(device)
+            down, full = data['down'], data['full']
+            down = down.to(device)
+            full = full.to(device)
 
             with self.accelerator.autocast():
-                loss = self.vae(
-                    img,
+                loss, fmap  = self.vae(
+                    full,
                     add_gradient_penalty = apply_grad_penalty,
-                    return_loss = True
+                    return_loss = True,
+                    return_latent = True
                 )
+            
+            with torch.no_grad():
+                fmap_ema = self.ema_vae(
+                    down,
+                    return_loss = False,
+                    return_latent = True)
+                
+            # add loss between encoder output of down-emavae and full-vae 
+            loss = loss + F.SmoothL1Loss(fmap, fmap_ema).sum(dim=-1).sum()
 
             self.accelerator.backward(loss / self.grad_accum_every)
 
@@ -339,8 +351,7 @@ class VQGanVAETrainer(nn.Module):
             self.discr_optim.zero_grad()
 
             for _ in range(self.grad_accum_every):
-                data = next(self.dl_iter)
-                img = data['full']
+                img = next(self.dl_iter)
                 img = img.to(device)
 
                 loss = self.vae(img, return_discr_loss = True)
@@ -375,7 +386,6 @@ class VQGanVAETrainer(nn.Module):
                 model.eval()
 
                 valid_data = next(self.valid_dl_iter)
-                valid_data = valid_data['full']
                 valid_data = valid_data.to(device)
 
                 recons = model(valid_data, return_recons = True)
@@ -393,8 +403,6 @@ class VQGanVAETrainer(nn.Module):
                 img_dir = self.results_folder / 'img'
                 if not Path.exists(img_dir):
                     img_dir.mkdir()
-                save_image(grid, str(img_dir / f'{filename}.png'))
-
                 save_image(grid, str(img_dir / f'{filename}.png'))
 
             self.print(f'{steps}: saving to {str(self.results_folder)}')

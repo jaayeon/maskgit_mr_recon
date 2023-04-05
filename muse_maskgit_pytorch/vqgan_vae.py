@@ -287,13 +287,13 @@ class VQGanVAE(nn.Module):
         self,
         *,
         dim,
-        channels = 3,
+        channels = 2,
         layers = 4,
         l2_recon_loss = False,
         use_hinge_loss = True,
         vgg = None,
         vq_codebook_dim = 256,
-        vq_codebook_size = 512,
+        vq_codebook_size = 512, #8192
         vq_decay = 0.8,
         vq_commitment_weight = 1.,
         vq_kmeans_init = True,
@@ -414,9 +414,9 @@ class VQGanVAE(nn.Module):
         return self.vq.codebook
 
     def encode(self, fmap):
-        fmap = self.enc_dec.encode(fmap)
-        fmap, indices, commit_loss = self.vq(fmap)
-        return fmap, indices, commit_loss
+        fmap1 = self.enc_dec.encode(fmap)
+        fmap2, indices, commit_loss = self.vq(fmap1)
+        return fmap2, indices, commit_loss, fmap1
 
     def decode_from_ids(self, ids):
         codes = self.codebook[ids]
@@ -433,7 +433,8 @@ class VQGanVAE(nn.Module):
         return_loss = False,
         return_discr_loss = False,
         return_recons = False,
-        add_gradient_penalty = True
+        add_gradient_penalty = True,
+        return_latent = False
     ):
         batch, channels, height, width, device = *img.shape, img.device
 
@@ -442,9 +443,12 @@ class VQGanVAE(nn.Module):
 
         assert channels == self.channels, 'number of channels on image or sketch is not equal to the channels set on this VQGanVAE'
 
-        fmap, indices, commit_loss = self.encode(img)
+        fmap, indices, commit_loss, fmap_encoder = self.encode(img)
 
         fmap = self.decode(fmap)
+    
+        if return_latent and not return_loss: #only to get fmap_encoder of ema_vae
+            return fmap_encoder
 
         if not return_loss and not return_discr_loss:
             return fmap
@@ -518,4 +522,7 @@ class VQGanVAE(nn.Module):
         if return_recons:
             return loss, fmap
 
+        if return_latent: #for downsampled encoder
+            return loss, fmap_encoder
+        
         return loss
