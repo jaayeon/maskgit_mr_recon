@@ -33,7 +33,7 @@ def run_vqgan(args, dataset):
         layers=4,
         dim=256,
         vq_codebook_dim=32, #256
-        vq_codebook_size=1024
+        vq_codebook_size=2048
     )
 
     trainer = VQGanVAETrainer(
@@ -56,7 +56,7 @@ def run_vqgan_ema(args, dataset):
         layers=4,
         dim=256,
         vq_codebook_dim=32, #256
-        vq_codebook_size=1024
+        vq_codebook_size=2048
     )
 
     trainer = VQGanVAETrainerEMA(
