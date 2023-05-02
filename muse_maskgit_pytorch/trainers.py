@@ -236,6 +236,7 @@ class VQGanVAETrainer(nn.Module):
 
         if use_ema:
             self.ema_vae = EMA(vae, update_after_step = ema_update_after_step, update_every = ema_update_every)
+            self.ema_vae.eval()
             self.ema_vae = self.accelerator.prepare(self.ema_vae)
 
         self.dl_iter = cycle(self.dl)
@@ -378,7 +379,8 @@ class VQGanVAETrainer(nn.Module):
                 valid_data = valid_data['full']
                 valid_data = valid_data.to(device)
 
-                recons = model(valid_data, return_recons = True)
+                with torch.no_grad():
+                    recons = model(valid_data, return_recons = True)
 
                 # else save a grid of images
 

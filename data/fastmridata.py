@@ -43,6 +43,8 @@ class FastMRIDataset(Dataset):
         #downsample
         self.down = opt.down
 
+        self.resize = transforms.Resize(opt.input_size)
+
         self.rng = np.random.RandomState(opt.seed)
         self.datalist = sorted(glob.glob(os.path.join(opt.data_path, opt.dataset, mode, '*.pkl')))
         if mode=='train':
@@ -62,6 +64,8 @@ class FastMRIDataset(Dataset):
         kdata = np.array(kdata) #320, 320, 2
         # kdata = self.to_tensor(kdata)
         kdata = torch.tensor(kdata).permute(2,0,1)
+        kdata = self.resize(kdata)
+    
         kdata = self.scale(kdata)
 
         if self.do_downsample:
@@ -145,7 +149,7 @@ class FastMRIDataset(Dataset):
     def downsample(self, arr, idx):
         c,h,w=arr.shape
         downsample = self.rng.uniform(size=1)[0]*self.opt.downsample
-        downsample = 2. if downsample<2 else downsample
+        downsample = 4. if downsample<4 else downsample
         num_low_freqs = int(self.opt.input_size/downsample*self.opt.low_freq_ratio)
         num_high_freqs = int(self.opt.input_size/downsample)-num_low_freqs
 

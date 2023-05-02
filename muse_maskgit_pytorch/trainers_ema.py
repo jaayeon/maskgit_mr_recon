@@ -237,6 +237,7 @@ class VQGanVAETrainerEMA(nn.Module):
 
         if use_ema:
             self.ema_vae = EMA(vae, update_after_step = ema_update_after_step, update_every = ema_update_every)
+            self.ema_vae.eval()
             self.ema_vae = self.accelerator.prepare(self.ema_vae)
 
         self.dl_iter = cycle(self.dl)
@@ -320,21 +321,22 @@ class VQGanVAETrainerEMA(nn.Module):
 
             with self.accelerator.autocast():
                 loss, fmap  = self.vae(
+                    down, #full
                     full,
                     add_gradient_penalty = apply_grad_penalty,
                     return_loss = True,
                     return_latent = True
                 )
-            
-            with torch.no_grad():
-                fmap_ema = self.ema_vae(
-                    down,
-                    return_loss = False,
-                    return_latent = True)
+            '''
+                with torch.no_grad():
+                    fmap_ema = self.ema_vae(
+                        full, #down
+                        return_loss = False,
+                        return_latent = True)
                 
-            # add loss between encoder output of down-emavae and full-vae 
-            loss = loss + F.smooth_l1_loss(fmap, fmap_ema).sum(dim=-1).sum()
-
+            # # add loss between encoder output of down-emavae and full-vae 
+            loss = loss + F.smooth_l1_loss(fmap, fmap_ema.detach()).sum(dim=-1).sum()
+            '''
             self.accelerator.backward(loss / self.grad_accum_every)
 
             accum_log(logs, {'loss': loss.item() / self.grad_accum_every})
@@ -352,10 +354,11 @@ class VQGanVAETrainerEMA(nn.Module):
 
             for _ in range(self.grad_accum_every):
                 data = next(self.dl_iter)
-                img = data['full']
-                img = img.to(device)
+                down, full = data['down'], data['full']
+                down = down.to(device)
+                full = full.to(device)
 
-                loss = self.vae(img, return_discr_loss = True)
+                loss = self.vae(down, full, return_discr_loss = True)
 
                 self.accelerator.backward(loss / self.grad_accum_every)
 
@@ -389,19 +392,22 @@ class VQGanVAETrainerEMA(nn.Module):
                 valid_data = next(self.valid_dl_iter)
                 down = valid_data['down']
                 full = valid_data['full']
-                valid_data = torch.stack([down, full], dim=0)
-                valid_data = rearrange(valid_data, 'r b ... -> (b r) ...')
-                valid_data = valid_data.to(device)
+                # valid_data = torch.stack([down, full], dim=0)
+                # valid_data = rearrange(valid_data, 'r b ... -> (b r) ...')
+                # valid_data = valid_data.to(device)
+                valid_data = down.to(device)
 
-                recons = model(valid_data, return_recons = True)
+                with torch.no_grad():
+                    recons = model(valid_data, return_recons = True)
 
                 # else save a grid of images
 
-                imgs_and_recons = torch.stack((valid_data, recons), dim = 0)
+                # imgs_and_recons = torch.stack((valid_data, recons), dim = 0)
+                imgs_and_recons = torch.stack((valid_data, recons, full), dim = 0)
                 imgs_and_recons = rearrange(imgs_and_recons, 'r b ... -> (b r) ...')
 
                 imgs_and_recons = imgs_and_recons.detach().cpu().float().clamp(0., 1.)
-                grid = make_grid(imgs_and_recons, nrow = 4, normalize = True, scale_each=True)
+                grid = make_grid(imgs_and_recons, nrow = 6, normalize = True, scale_each=True)
 
                 logs['reconstructions'] = grid
 

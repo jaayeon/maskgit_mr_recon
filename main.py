@@ -31,9 +31,9 @@ def run_vqgan(args, dataset):
     vae = VQGanVAE(
         channels=1,
         layers=4,
-        dim=256,
+        dim=256, #256
         vq_codebook_dim=32, #256
-        vq_codebook_size=2048
+        vq_codebook_size=8192 #2048
     )
 
     trainer = VQGanVAETrainer(
@@ -44,7 +44,7 @@ def run_vqgan(args, dataset):
         grad_accum_every=8,
         num_train_steps=50000, 
         results_folder=args.output_path,
-        use_ema=True
+        use_ema=False
     ).cuda()
     trainer.train()
 
@@ -53,7 +53,7 @@ def run_vqgan(args, dataset):
 def run_vqgan_ema(args, dataset):
     vae = VQGanVAE(
         channels=1,
-        layers=4,
+        layers=8,
         dim=256,
         vq_codebook_dim=32, #256
         vq_codebook_size=2048

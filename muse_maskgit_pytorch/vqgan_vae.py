@@ -1,6 +1,7 @@
 from pathlib import Path
 import copy
 import math
+import random
 from math import sqrt
 from functools import partial, wraps
 
@@ -153,7 +154,8 @@ class Discriminator(nn.Module):
         dims,
         channels = 3,
         groups = 16,
-        init_kernel_size = 5
+        init_kernel_size = 5,
+        input_size = 80
     ):
         super().__init__()
         dim_pairs = zip(dims[:-1], dims[1:])
@@ -174,11 +176,23 @@ class Discriminator(nn.Module):
             nn.Conv2d(dim, 1, 4)
         )
 
+        self.input_size = input_size
+
     def forward(self, x):
+        x = self.random_crop(x)
         for net in self.layers:
             x = net(x)
 
         return self.to_logits(x)
+    
+    def random_crop(self, x):
+        size = x.size()[-1]
+        if size == self.input_size:
+            return x
+        rh = random.randint(0, size-self.input_size)
+        rw = random.randint(0, size-self.input_size)
+        return x[:,:,rh:rh+self.input_size, rw:rw+self.input_size]
+
 
 # resnet encoder / decoder
 
@@ -430,6 +444,7 @@ class VQGanVAE(nn.Module):
     def forward(
         self,
         img,
+        full=None,
         return_loss = False,
         return_discr_loss = False,
         return_recons = False,
@@ -444,11 +459,11 @@ class VQGanVAE(nn.Module):
         assert channels == self.channels, 'number of channels on image or sketch is not equal to the channels set on this VQGanVAE'
 
         fmap, indices, commit_loss, fmap_encoder = self.encode(img)
+        # print('fmap shape: ', fmap.shape)
+        if not return_loss and return_latent: #only to get fmap_encoder of ema_vae
+            return fmap_encoder
 
         fmap = self.decode(fmap)
-    
-        if return_latent and not return_loss: #only to get fmap_encoder of ema_vae
-            return fmap_encoder
 
         if not return_loss and not return_discr_loss:
             return fmap
@@ -462,13 +477,16 @@ class VQGanVAE(nn.Module):
 
             fmap.detach_()
             img.requires_grad_()
+            # full.requires_grad_()
 
             fmap_discr_logits, img_discr_logits = map(self.discr, (fmap, img))
+            # fmap_discr_logits, img_discr_logits = map(self.discr, (fmap, full))
 
             discr_loss = self.discr_loss(fmap_discr_logits, img_discr_logits)
 
             if add_gradient_penalty:
                 gp = gradient_penalty(img, img_discr_logits)
+                # gp = gradient_penalty(full, img_discr_logits)
                 loss = discr_loss + gp
 
             if return_recons:
@@ -479,6 +497,7 @@ class VQGanVAE(nn.Module):
         # reconstruction loss
 
         recon_loss = self.recon_loss_fn(fmap, img)
+        # recon_loss = self.recon_loss_fn(fmap, full)
 
         # early return if training on grayscale
 
@@ -491,6 +510,7 @@ class VQGanVAE(nn.Module):
         # perceptual loss
 
         img_vgg_input = img
+        # img_vgg_input = full
         fmap_vgg_input = fmap
 
         if img.shape[1] == 1:
@@ -516,8 +536,7 @@ class VQGanVAE(nn.Module):
         adaptive_weight.clamp_(max = 1e4)
 
         # combine losses
-
-        loss = recon_loss + perceptual_loss + commit_loss + adaptive_weight * gen_loss
+        loss = recon_loss + 0.1*perceptual_loss + commit_loss + adaptive_weight * gen_loss
 
         if return_recons:
             return loss, fmap
